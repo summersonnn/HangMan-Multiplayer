@@ -1,45 +1,133 @@
 from socket import *
 import threading
+import random
 myClients = []
+users = []
+wrongGuesses = []
+wrongPhrases = []
 
 class ThreadedServer():
-	
+	allowedAttempt = 7
 	playerCount = 0
 	currentPlayers = 0
 	gameStart = False
 
 	def game(self, client, addr):
+		global users
 		global myClients
-		if self.gameStart:
-			print("Game is starting...")
-		else:
-			print("Waiting for players...")
-		while True:
-			data = client.recv(1024)
-			if not data:
-				break
-			for client in myClients:
-				client.send(data)
+		global wrongGuesses
+		global wrongPhrases
 
-	def sendAllClients(self, message):
+		if self.gameStart:
+			word = random.choice(open("words.txt").readlines())
+			word = word[:-1]
+			word = word.lower()
+			secretWord = "_|" * len(word)
+			secretWord = secretWord[:-1]
+			info = "Game is starting...\nPlayer orders: "
+			for name in users:
+				info = info + name + "---"
+			for clientx in myClients:
+				clientx.send(info.encode())
+
+		else:
+			info = "Waiting for players..."
+			for clientx in myClients:
+				clientx.send(info.encode())
+			
+		counter = 0
+		while self.gameStart:
+			found = False
+			currentUser = str(users[counter % self.playerCount])
+			info = "\n" + "Current word: " + secretWord + "\n" + currentUser + " is about to play...\nRemaining lives: " + str(self.allowedAttempt)
+			info = info + "\nWrong LetterGuesses: " + str(wrongGuesses) + "\nWrong Phrase Guesses: " + str(wrongPhrases)
+			
+			self.sendAllClientsExceptSender(None, info)
+
+			privateMessage = "\nPlease make a guess for phrase or a letter?"
+			privateTaker = myClients[counter % self.playerCount]
+			privateTaker.send(privateMessage.encode())
+			guess = privateTaker.recv(1024)
+			guess = guess.decode()
+			guess = guess.lower()
+			
+			if guess == word:
+				secretWord = word
+				print ("\nEnd")
+			elif len(guess) > 1 or not guess:
+				wrongPhrases += [guess]
+				self.allowedAttempt -= 1
+			elif len(guess) == 1:
+				for pos, char in enumerate(word):
+					if char == guess:
+						found = True
+						tempList = list(secretWord)
+						tempList[pos*2] = word[pos]
+						secretWord = ''.join(tempList)
+				if found == False and guess not in wrongGuesses:
+					wrongGuesses += guess
+					self.allowedAttempt -= 1
+			
+
+			if self.allowedAttempt == 0:
+				info = "\nYOU HUNG THE MAN!!! Word was: " + word
+				self.sendAllClientsExceptSender(None, info)	
+				break	
+			elif secretWord.find("_") == -1:
+				info = "\nGame is finished. \nWord: " + word + "\nWinner: " + currentUser
+				self.sendAllClientsExceptSender(None, info)
+				break
+			counter += 1
+		#self.gameStart = False
+		#wrongGuesses = []
+		#wrongPhrases = []
+
+		#self.playAgain(client,addr)
+
+	'''def playAgain(self, client, addr):
 		global myClients
-		for client in myClients:
-			client.send(message.encode())
+		global users 
+
+		self.gameStart = False
+		counter = self.currentPlayers
+		message = "\nDo you want to play again? Y OR N?"
+		self.sendAllClientsExceptSender(None, message)
+		while True:
+			if counter == 0
+				break
+			again = client.recv(1024)
+			again = again.decode()
+			again = again.upper()
+			if again != "Y":
+				self.currentPlayers -= 1
+				user.remove(myClients.index(client))
+				myClients.remove(client)
+			else:
+				self.game(client,addr)
+			counter -= 1'''
+
+		
+	def sendAllClientsExceptSender(self, client, message):
+		tempClients = myClients.copy()
+		if client != None:
+			tempClients.remove(client)
+		for clientx in tempClients:
+			clientx.send(message.encode())
 
 	def listenToClient(self, client, addr):
 		global myClients
-	    
-	        
-		welcomeMessage = "Welcome. To register, press R. To login, press any key.\n"
+		global users
+	 
+		welcomeMessage = "\nWelcome. To register, press R. To login, press any key?"
 		client.send(welcomeMessage.encode())
 		message = client.recv(1024)
 		message = message.decode()
 		if 	message == "R" or message == "r":
-			askusername = "Choose a username"
+			askusername = "Choose a username?"
 			client.send(askusername.encode())
 			username = client.recv(1024)
 			username = username.decode()
-			askpassword = "Choose a password"
+			askpassword = "Choose a password?"
 			client.send(askpassword.encode())
 			password = client.recv(1024)
 			password = password.decode()
@@ -51,31 +139,32 @@ class ThreadedServer():
 
 		isValidUsername = False
 		while (not isValidUsername):
-			pleaseLogin = "Please type your username to login\n"
+			pleaseLogin = "\nPlease type your username to login?"
 			client.send(pleaseLogin.encode())
 			username = client.recv(1024)
-			username = username.decode() + "#"
+			username = username.decode()
 
 			openfile = open("idpw.txt", "r")
 			for line in openfile:
-				for part in line.split():
-					if username in part:
-						realpassword = part.partition("#")[2]
-						username = part.partition("#")[0]
-						isValidUsername = True
+				realusername = line.partition("#")[0]
+				if username == realusername:
+					isValidUsername = True
+					realpassword = line.partition("#")[2]
+					realpassword = realpassword[:-1]
 				
 		while True:
-			typePassword = "Please type your password\n"
+			typePassword = "\nPlease type your password?"
 			client.send(typePassword.encode())
 			password = client.recv(1024)
 			password = password.decode()
 
 			if realpassword == password:
 				self.currentPlayers = self.currentPlayers + 1
-				welcomeMessage = "Welcome " + username + ". You logged in successfully."
+				welcomeMessage = "\nWelcome " + username + ". You logged in successfully."
 				welcomeMessage = welcomeMessage + "\nThere are now " + str(self.currentPlayers) + " players on the server."
-				welcomeMessage = welcomeMessage + "\nPlayerCount: " + str(self.playerCount) + "\n"
+				welcomeMessage = welcomeMessage + "\nPlayerCount: " + str(self.playerCount)
 				client.send(welcomeMessage.encode())
+				users += [username]
 				break
 
 		if self.currentPlayers == self.playerCount:
@@ -87,6 +176,7 @@ class ThreadedServer():
 
 	def __init__(self,serverPort, playerCount):
 		global myClients
+		global users
 		self.playerCount = playerCount
 
 		try:

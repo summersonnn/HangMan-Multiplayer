@@ -14,11 +14,13 @@ print("Socket connected using ip " + serverName)
 
 
 while(True):
-	message=clientSocket.recv(1024)
-	response=input(message.decode())
+	message = clientSocket.recv(1024)
+	message = message.decode()
+	print(message)
+	if (message[-1] == '?'):
+		response=input()
+		clientSocket.send(response.encode())
 
-	clientSocket.send(response.encode())
-	
 	
 clientSocket.close()
 
