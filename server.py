@@ -38,7 +38,7 @@ class ThreadedServer():
 		counter = 0
 		while self.gameStart:
 			found = False
-			currentUser = str(users[counter % self.playerCount])
+			currentUser = str(users[counter % self.currentPlayers])
 			info = "\n" + "Current word: " + secretWord + "\n" + currentUser + " is about to play...\nRemaining lives: " + str(self.allowedAttempt)
 			info = info + "\nWrong LetterGuesses: " + str(wrongGuesses) + "\nWrong Phrase Guesses: " + str(wrongPhrases)
 			
@@ -78,33 +78,51 @@ class ThreadedServer():
 				self.sendAllClientsExceptSender(None, info)
 				break
 			counter += 1
-		#self.gameStart = False
-		#wrongGuesses = []
-		#wrongPhrases = []
 
-		#self.playAgain(client,addr)
+		if self.gameStart == True:
+			self.gameStart = False
+			wrongGuesses = []
+			wrongPhrases = []
+			self.allowedAttempt = 7
+			self.playAgain(client,addr)
 
-	'''def playAgain(self, client, addr):
+		
+
+	def playAgain(self, client, addr):
 		global myClients
 		global users 
+		counter = 0
 
-		self.gameStart = False
-		counter = self.currentPlayers
-		message = "\nDo you want to play again? Y OR N?"
-		self.sendAllClientsExceptSender(None, message)
+		temp = self.currentPlayers
+		self.currentPlayers = 0
+		
 		while True:
-			if counter == 0
+			if counter == temp:
 				break
-			again = client.recv(1024)
-			again = again.decode()
-			again = again.upper()
-			if again != "Y":
-				self.currentPlayers -= 1
-				user.remove(myClients.index(client))
-				myClients.remove(client)
-			else:
+
+			privateMessage = "\nContinue? Y OR N?"
+			privateTaker = myClients[counter % temp]
+			privateTaker.send(privateMessage.encode())
+			answer = privateTaker.recv(1024)
+			answer = answer.decode()
+			print ("\nMyclients: \n" + str(myClients))
+
+			print(answer)
+			if answer == "Y" or answer == "y":
+				self.currentPlayers += 1
+				if self.currentPlayers == self.playerCount:
+					self.gameStart = True
+
+				print (self.currentPlayers)
 				self.game(client,addr)
-			counter -= 1'''
+			else:
+				privateMessage = "\nBye!"
+				privateTaker.send(privateMessage.encode())
+				users.remove(users[myClients.index(privateTaker)])
+				myClients.remove(privateTaker)
+				counter -= 1
+				temp -= 1
+			counter += 1
 
 		
 	def sendAllClientsExceptSender(self, client, message):
